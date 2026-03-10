@@ -1,20 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
-import { getDashboardOverview } from "@/lib/dashboard";
+import { getDashboardOverview, listStaffUsers, registerStaffUser } from "@/lib/dashboard";
 import { useDashboardSession } from "@/lib/dashboard-session";
 import { formatCompactId, formatCurrency, formatDateTime, formatStatusLabel } from "@/lib/format";
-import type { DashboardOverview } from "@/types";
+import type { DashboardOverview, RegisterStaffRequest, StaffUser } from "@/types";
 
 import styles from "../page.module.css";
+
+const initialStaffForm: RegisterStaffRequest = {
+  full_name: "",
+  email: "",
+  password: "",
+  role_name: "agent",
+};
 
 export default function DashboardPage() {
   const { currentUser } = useDashboardSession();
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+  const [isRegisteringStaff, setIsRegisteringStaff] = useState(false);
+  const [staffForm, setStaffForm] = useState<RegisterStaffRequest>(initialStaffForm);
   const [error, setError] = useState<string | null>(null);
+  const [staffError, setStaffError] = useState<string | null>(null);
+  const [staffFeedback, setStaffFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -46,10 +59,70 @@ export default function DashboardPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadStaffUsers() {
+      try {
+        setIsLoadingStaff(true);
+        setStaffError(null);
+
+        const nextStaffUsers = await listStaffUsers();
+        if (active) {
+          setStaffUsers(nextStaffUsers);
+        }
+      } catch (loadError) {
+        if (active) {
+          setStaffError(loadError instanceof Error ? loadError.message : "Failed to load staff users.");
+        }
+      } finally {
+        if (active) {
+          setIsLoadingStaff(false);
+        }
+      }
+    }
+
+    void loadStaffUsers();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const displayUser = currentUser ?? overview?.currentUser ?? null;
+  const canRegisterStaff = displayUser?.role_name === "admin";
   const tickets = overview?.tickets.slice(0, 6) ?? [];
   const refunds = overview?.refunds.slice(0, 6) ?? [];
   const customers = overview?.customers.slice(0, 6) ?? [];
+
+  async function handleRegisterStaff(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      setIsRegisteringStaff(true);
+      setStaffError(null);
+      setStaffFeedback(null);
+
+      const createdUser = await registerStaffUser({
+        email: staffForm.email.trim(),
+        password: staffForm.password,
+        full_name: staffForm.full_name.trim(),
+        role_name: staffForm.role_name,
+      });
+
+      setStaffForm(initialStaffForm);
+      setStaffFeedback(`Created ${createdUser.full_name} as ${formatStatusLabel(createdUser.role_name ?? "agent")}.`);
+      setStaffUsers((current) =>
+        [...current, createdUser].sort((left, right) => left.full_name.localeCompare(right.full_name)),
+      );
+    } catch (submitError) {
+      setStaffError(
+        submitError instanceof Error ? submitError.message : "Failed to register the staff user.",
+      );
+    } finally {
+      setIsRegisteringStaff(false);
+    }
+  }
 
   return (
     <section className={styles.stack}>
@@ -102,6 +175,120 @@ export default function DashboardPage() {
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div className={styles.gridCompact}>
+        <section className={styles.panel}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionEyebrow}>Staff directory</p>
+              <h2 className={styles.sectionTitle}>Active platform users</h2>
+            </div>
+          </div>
+
+          {staffError ? <p className={styles.error}>{staffError}</p> : null}
+
+          <div className={styles.list}>
+            {isLoadingStaff ? <p className={styles.emptyState}>Loading staff directory...</p> : null}
+            {!isLoadingStaff && staffUsers.length === 0 ? (
+              <p className={styles.emptyState}>No active staff users were returned by the backend.</p>
+            ) : null}
+            {staffUsers.map((staffUser) => (
+              <article key={staffUser.id} className={styles.messageCard}>
+                <p className={styles.listItemTitle}>{staffUser.full_name}</p>
+                <p className={styles.listItemMeta}>{staffUser.email}</p>
+                <div className={styles.badgeRow}>
+                  <span className={styles.badgeWarm}>
+                    {formatStatusLabel(staffUser.role_name ?? "agent")}
+                  </span>
+                  <span className={styles.badge}>{formatCompactId(staffUser.id)}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.panel}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionEyebrow}>Access management</p>
+              <h2 className={styles.sectionTitle}>Register staff user</h2>
+            </div>
+          </div>
+
+          {staffFeedback ? <p className={styles.success}>{staffFeedback}</p> : null}
+
+          {!canRegisterStaff ? (
+            <p className={styles.emptyState}>
+              Only an admin account should create staff users from the frontend.
+            </p>
+          ) : (
+            <form className={styles.actions} onSubmit={handleRegisterStaff}>
+              <div className={styles.detailGrid}>
+                <label className={styles.actions}>
+                  <span className={styles.metaLabel}>Full name</span>
+                  <input
+                    className={styles.input}
+                    value={staffForm.full_name}
+                    onChange={(event) =>
+                      setStaffForm((current) => ({ ...current, full_name: event.target.value }))
+                    }
+                    required
+                  />
+                </label>
+
+                <label className={styles.actions}>
+                  <span className={styles.metaLabel}>Email</span>
+                  <input
+                    className={styles.input}
+                    type="email"
+                    value={staffForm.email}
+                    onChange={(event) =>
+                      setStaffForm((current) => ({ ...current, email: event.target.value }))
+                    }
+                    required
+                  />
+                </label>
+
+                <label className={styles.actions}>
+                  <span className={styles.metaLabel}>Password</span>
+                  <input
+                    className={styles.input}
+                    type="password"
+                    value={staffForm.password}
+                    onChange={(event) =>
+                      setStaffForm((current) => ({ ...current, password: event.target.value }))
+                    }
+                    minLength={8}
+                    required
+                  />
+                </label>
+
+                <label className={styles.actions}>
+                  <span className={styles.metaLabel}>Role</span>
+                  <select
+                    className={styles.select}
+                    value={staffForm.role_name}
+                    onChange={(event) =>
+                      setStaffForm((current) => ({
+                        ...current,
+                        role_name: event.target.value as RegisterStaffRequest["role_name"],
+                      }))
+                    }
+                  >
+                    <option value="agent">Agent</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+              </div>
+
+              <button type="submit" className={styles.button} disabled={isRegisteringStaff}>
+                {isRegisteringStaff ? "Creating staff user..." : "Create staff user"}
+              </button>
+            </form>
+          )}
+        </section>
+      </div>
 
       <div className={styles.gridCompact}>
         <section className={styles.panel}>

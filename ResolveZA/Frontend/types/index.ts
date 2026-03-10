@@ -14,6 +14,13 @@ export type LoginRequest = {
   password: string;
 };
 
+export type RegisterStaffRequest = {
+  email: string;
+  password: string;
+  full_name: string;
+  role_name: UserRole;
+};
+
 export type TokenResponse = {
   access_token: string;
   refresh_token: string;
@@ -32,6 +39,7 @@ export type User = {
 };
 
 export type UserResponse = User;
+export type StaffUser = User;
 
 export type TicketStatus =
   | "OPEN"
@@ -75,6 +83,19 @@ export type Customer = CustomerSummary & {
   is_active: boolean;
 };
 
+export type CustomerCreateRequest = {
+  full_name: string;
+  email: string;
+  phone_number: string;
+  id_number?: string;
+};
+
+export type CustomerUpdateRequest = {
+  full_name?: string;
+  email?: string;
+  phone_number?: string;
+};
+
 export type Account = {
   id: UUID;
   account_number: string;
@@ -115,6 +136,24 @@ export type Ticket = TicketSummary & {
   account_id?: UUID | null;
 };
 
+export type TicketCreateRequest = {
+  customer_id: UUID;
+  category: TicketCategory | string;
+  priority: TicketPriority | string;
+  subject: string;
+  description: string;
+  account_id?: UUID | null;
+};
+
+export type TicketAssignRequest = {
+  agent_id: UUID;
+};
+
+export type EscalateTicketRequest = {
+  reason: string;
+  escalate_to_agent_id?: UUID | null;
+};
+
 export type PaginatedTickets = ApiListResponse<TicketSummary>;
 
 export type TicketMessageSender = "CUSTOMER" | "AGENT" | "AI_ASSISTANT" | string;
@@ -144,6 +183,13 @@ export type Refund = RefundSummary & {
   approved_at?: ISODateString | null;
   processed_at?: ISODateString | null;
   created_at: ISODateString;
+};
+
+export type RefundCreateRequest = {
+  ticket_id: UUID;
+  transaction_id: UUID;
+  amount: CurrencyAmount;
+  idempotency_key: string;
 };
 
 export type RefundListItem = RefundSummary;

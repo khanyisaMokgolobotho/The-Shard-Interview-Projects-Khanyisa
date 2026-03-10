@@ -161,6 +161,12 @@
   border-color: var(--border);
 }
 
+.button:disabled,
+.secondaryButton:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .list {
   display: grid;
   gap: 12px;

@@ -3,20 +3,28 @@ import type {
   Account,
   ApiListResponse,
   Customer,
+  CustomerCreateRequest,
   CustomerFilters,
   CustomerSummary,
+  CustomerUpdateRequest,
   CustomerWorkspace,
   DashboardOverview,
+  EscalateTicketRequest,
   OverviewRefund,
   OverviewTicket,
   PaginatedCustomers,
   PaginatedTickets,
   Refund,
+  RefundCreateRequest,
   RefundFilters,
   RefundListItem,
   RefundSummary,
   RefundWorkspace,
+  RegisterStaffRequest,
+  StaffUser,
   Ticket,
+  TicketAssignRequest,
+  TicketCreateRequest,
   TicketFilters,
   TicketMessage,
   TicketSummary,
@@ -81,6 +89,14 @@ export function getCurrentUserProfile() {
 
 export const getCurrentProfile = getCurrentUserProfile;
 
+export function listStaffUsers() {
+  return api.get<StaffUser[]>("/auth/users");
+}
+
+export function registerStaffUser(payload: RegisterStaffRequest) {
+  return api.post<User>("/auth/register", payload);
+}
+
 export function listCustomers(filters: CustomerFilters = {}) {
   return api.get<PaginatedCustomers>(
     `/customers${toQueryString({
@@ -99,6 +115,14 @@ export function listAllCustomers(search?: string) {
 
 export function getCustomer(customerId: string) {
   return api.get<Customer>(`/customers/${customerId}`);
+}
+
+export function createCustomer(payload: CustomerCreateRequest) {
+  return api.post<Customer>("/customers", payload);
+}
+
+export function updateCustomer(customerId: string, payload: CustomerUpdateRequest) {
+  return api.patch<Customer>(`/customers/${customerId}`, payload);
 }
 
 export function getCustomerAccounts(customerId: string) {
@@ -131,6 +155,14 @@ export function getTicket(ticketId: string) {
   return api.get<Ticket>(`/tickets/${ticketId}`);
 }
 
+export function createTicket(payload: TicketCreateRequest) {
+  const { customer_id, ...ticketPayload } = payload;
+  return api.post<Ticket>(
+    `/tickets${toQueryString({ customer_id: customer_id })}`,
+    ticketPayload,
+  );
+}
+
 export function getTicketMessages(ticketId: string, includeInternal = true) {
   return api.get<TicketMessage[]>(
     `/tickets/${ticketId}/messages${toQueryString({ include_internal: includeInternal })}`,
@@ -148,6 +180,14 @@ export function addTicketMessage(ticketId: string, content: string, isInternal: 
   });
 }
 
+export function assignTicket(ticketId: string, payload: TicketAssignRequest) {
+  return api.patch<Ticket>(`/tickets/${ticketId}/assign`, payload);
+}
+
+export function escalateTicket(ticketId: string, payload: EscalateTicketRequest) {
+  return api.post(`/tickets/${ticketId}/escalate`, payload);
+}
+
 export function listRefunds(filters: RefundFilters = {}) {
   return api.get<RefundListItem[]>(
     `/refunds${toQueryString({ status: filters.status, ticket_id: filters.ticketId })}`,
@@ -156,6 +196,10 @@ export function listRefunds(filters: RefundFilters = {}) {
 
 export function getRefund(refundId: string) {
   return api.get<Refund>(`/refunds/${refundId}`);
+}
+
+export function createRefund(payload: RefundCreateRequest) {
+  return api.post<Refund>("/refunds", payload);
 }
 
 export function approveRefund(refundId: string, approved: boolean, rejectionReason?: string) {
