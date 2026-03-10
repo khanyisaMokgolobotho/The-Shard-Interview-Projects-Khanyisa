@@ -19,8 +19,11 @@ ResolveZA/
 ## Features
 
 - JWT-based staff authentication
+- Admin-only staff registration plus authenticated staff directory lookup
 - Protected frontend routes for authenticated users
-- Customer, ticket, and refund workflows in the backend
+- Customer create, edit, lookup, and related account/transaction inspection flows
+- Ticket create, assignment, escalation, status, messaging, and refund-request workflows
+- Refund request and approval workflows in the backend
 - Protected dashboard shell with sidebar navigation, current-user state, and logout
 - Live overview, customers, tickets, and refunds pages backed by real API data
 - Typed frontend dashboard data layer for users, customers, accounts, transactions, tickets, and refunds
@@ -60,6 +63,7 @@ After the stack is up:
 - open `http://localhost:3000`
 - unauthenticated requests are redirected to `http://localhost:3000/login`
 - sign in with one of the seeded staff accounts below
+- if the SQL database is fresh and login fails, run the seed step in `Backend Setup` below
 
 ## Backend Setup
 
@@ -135,6 +139,12 @@ From `Backend/`:
 .\venv\Scripts\python.exe -c "import sys; from app.cli import main; sys.argv=['app.cli','reset-db','--confirm','--seed']; main()"
 ```
 
+If you are running the backend inside Docker and want the same fresh reset and seed flow:
+
+```powershell
+docker exec resolveza-backend python -c "import sys; from app.cli import main; sys.argv=['app.cli','reset-db','--confirm','--seed']; main()"
+```
+
 ## Frontend Setup
 
 ### 1. Install dependencies
@@ -167,9 +177,9 @@ npm run dev
 
 The frontend shell includes:
 
-- `/dashboard` for overview metrics and recent queue activity
-- `/customers` for customer, account, transaction, ticket, and refund relationships
-- `/tickets` for ticket detail, message history, and status updates
+- `/dashboard` for overview metrics, active staff visibility, and admin-only staff registration
+- `/customers` for customer create/edit plus account, transaction, ticket, and refund relationships
+- `/tickets` for ticket creation, assignment, escalation, status updates, message history, and refund requests
 - `/refunds` for refund review with linked ticket, customer, and transaction context
 
 Or run the frontend Docker image:
@@ -197,6 +207,12 @@ Login page:
 
 - `http://localhost:3000/login`
 
+Role notes:
+
+- `admin` can create staff users from the dashboard and via `POST /auth/register`
+- `agent`, `supervisor`, and `admin` can query the internal staff directory via `GET /auth/users`
+- ticket assignment remains limited to `supervisor` and `admin`
+
 Primary frontend dashboard files:
 
 - [`Frontend/lib/dashboard.ts`](/c:/Users/khany/The-Shard-Interview-Projects-Khanyisa/ResolveZA/Frontend/lib/dashboard.ts)
@@ -216,6 +232,12 @@ Backend health:
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://localhost:8000/health
 Invoke-WebRequest -UseBasicParsing http://localhost:8000/health/ready
+```
+
+Frontend availability:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://localhost:3000
 ```
 
 Frontend build:
@@ -239,12 +261,21 @@ cd Backend
 .\venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider
 ```
 
+Focused auth/staff RBAC checks:
+
+```powershell
+cd Backend
+.\venv\Scripts\python.exe -m pytest tests/unit/test_api.py tests/integration/test_api_flows.py -k "register or list_users or staff_can_list_users" -p no:cacheprovider
+```
+
 ## Auth Flow
 
 - Frontend stores access and refresh tokens in `localStorage`
 - Frontend also sets a lightweight `rzauth=1` cookie for route protection
 - Protected routes are enforced in [`Frontend/proxy.ts`](/c:/Users/khany/The-Shard-Interview-Projects-Khanyisa/ResolveZA/Frontend/proxy.ts)
 - Frontend API calls are handled through [`Frontend/lib/api.ts`](/c:/Users/khany/The-Shard-Interview-Projects-Khanyisa/ResolveZA/Frontend/lib/api.ts)
+- `POST /auth/register` is admin-only
+- `GET /auth/users` returns active internal users for assignment and staff-management UI flows
 
 ## Notes
 
