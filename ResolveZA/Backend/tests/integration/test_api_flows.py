@@ -360,7 +360,7 @@ class TestTicketFlow:
 
 class TestRBAC:
 
-    def test_agent_cannot_register_users(self, client, seeded):
+    def _legacy_open_registration_reference(self, client, seeded):
         """
         Register is open — but only admins can assign roles like 'admin'.
         We verify the endpoint is reachable but an agent creating another
@@ -372,10 +372,20 @@ class TestRBAC:
             "email": "selfregister@test.com",
             "password": "Password@123!",
             "full_name": "Self Registered",
-            "role": "agent",
+            "role_name": "agent",
         })
         # Register succeeds (open) — user gets agent role
         assert resp.status_code == 201
+
+    def test_agent_cannot_register_users(self, client, seeded):
+        token = seeded["tokens"]["agent"]
+        resp = client.post("/auth/register", headers=auth(token), json={
+            "email": "selfregister-blocked@test.com",
+            "password": "Password@123!",
+            "full_name": "Self Registered",
+            "role_name": "agent",
+        })
+        assert resp.status_code == 403
 
     def test_admin_can_register_users(self, client, seeded):
         token = seeded["tokens"]["admin"]
@@ -383,9 +393,17 @@ class TestRBAC:
             "email": "newagent@test.com",
             "password": "Password@123!",
             "full_name": "New Agent",
-            "role": "agent",
+            "role_name": "agent",
         })
         assert resp.status_code == 201
+
+    def test_staff_can_list_users(self, client, seeded):
+        token = seeded["tokens"]["agent"]
+        resp = client.get("/auth/users", headers=auth(token))
+        assert resp.status_code == 200
+        emails = [user["email"] for user in resp.json()]
+        assert "admin@test.com" in emails
+        assert "agent@test.com" in emails
 
     def test_agent_cannot_assign_tickets(self, client, seeded, db):
         """Only supervisors and admins can assign tickets."""

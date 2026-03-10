@@ -6,7 +6,7 @@ from app.schemas.auth import (
     LoginRequest, TokenResponse, RefreshRequest,
     RegisterUserRequest, UserResponse,
 )
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_roles
 from app.models.user import User
 from app.services.auth_service import auth_service
 
@@ -56,10 +56,14 @@ def refresh(request: RefreshRequest, db: Session = Depends(get_db)):
     status_code=201,
     summary="Register a new agent/admin user",
 )
-def register(request: RegisterUserRequest, db: Session = Depends(get_db)):
+def register(
+    request: RegisterUserRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
     """
-    Create a new platform user (agents, admins).
-    In production this endpoint should be protected by an admin role.
+    Create a new platform user (agents, supervisors, admins).
+    Admin only.
     """
     return auth_service.register(db, request)
 
@@ -74,3 +78,12 @@ def me(current_user: User = Depends(get_current_user)):
         is_active=current_user.is_active,
         role_name=current_user.role.name if current_user.role else None,
     )
+
+
+@router.get("/users", response_model=list[UserResponse], summary="List active staff users")
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("agent", "supervisor", "admin")),
+):
+    """Returns active internal users for assignment and admin workflows."""
+    return auth_service.list_users(db)

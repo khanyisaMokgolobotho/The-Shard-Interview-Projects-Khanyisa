@@ -15,6 +15,24 @@ logger = get_logger(__name__)
 
 
 class AuthService:
+    def list_users(self, db: Session) -> list[UserResponse]:
+        users = (
+            db.query(User)
+            .filter(User.is_active == True)
+            .order_by(User.full_name.asc())
+            .all()
+        )
+
+        return [
+            UserResponse(
+                id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                is_active=user.is_active,
+                role_name=user.role.name if user.role else None,
+            )
+            for user in users
+        ]
 
     def login(self, db: Session, request: LoginRequest) -> TokenResponse:
         """

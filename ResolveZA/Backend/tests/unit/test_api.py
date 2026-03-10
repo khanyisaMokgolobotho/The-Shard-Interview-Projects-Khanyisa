@@ -144,29 +144,56 @@ class TestAuthEndpoints:
 
     def test_register_creates_user(self, client, db):
         roles = seed_roles(db)
+        admin = seed_user(db, roles, "admin")
         db.commit()
 
-        resp = client.post("/auth/register", json={
-            "email": "newagent@test.com",
-            "password": "Password123",
-            "full_name": "New Agent",
-            "role_name": "agent",
-        })
+        resp = client.post(
+            "/auth/register",
+            headers=auth_headers(client, admin.email),
+            json={
+                "email": "newagent@test.com",
+                "password": "Password123",
+                "full_name": "New Agent",
+                "role_name": "agent",
+            },
+        )
         assert resp.status_code == 201
         assert resp.json()["email"] == "newagent@test.com"
         assert "hashed_password" not in resp.json()
 
+    def test_register_requires_admin(self, client, db):
+        roles = seed_roles(db)
+        agent = seed_user(db, roles, "agent")
+        db.commit()
+
+        resp = client.post(
+            "/auth/register",
+            headers=auth_headers(client, agent.email),
+            json={
+                "email": "blocked@test.com",
+                "password": "Password123",
+                "full_name": "Blocked User",
+                "role_name": "agent",
+            },
+        )
+        assert resp.status_code == 403
+
     def test_register_duplicate_email_is_409(self, client, db):
         roles = seed_roles(db)
+        admin = seed_user(db, roles, "admin")
         user = seed_user(db, roles, email="dup@test.com")
         db.commit()
 
-        resp = client.post("/auth/register", json={
-            "email": "dup@test.com",
-            "password": "Password123",
-            "full_name": "Dup",
-            "role_name": "agent",
-        })
+        resp = client.post(
+            "/auth/register",
+            headers=auth_headers(client, admin.email),
+            json={
+                "email": "dup@test.com",
+                "password": "Password123",
+                "full_name": "Dup",
+                "role_name": "agent",
+            },
+        )
         assert resp.status_code == 409
 
     def test_me_returns_current_user(self, client, db):
@@ -184,16 +211,33 @@ class TestAuthEndpoints:
         assert resp.status_code == 401  # no bearer token → 401 Unauthorized
 
     def test_short_password_rejected(self, client, db):
-        seed_roles(db)
+        roles = seed_roles(db)
+        admin = seed_user(db, roles, "admin")
         db.commit()
 
-        resp = client.post("/auth/register", json={
-            "email": "short@test.com",
-            "password": "abc",  # < 8 chars
-            "full_name": "Short",
-            "role_name": "agent",
-        })
+        resp = client.post(
+            "/auth/register",
+            headers=auth_headers(client, admin.email),
+            json={
+                "email": "short@test.com",
+                "password": "abc",  # < 8 chars
+                "full_name": "Short",
+                "role_name": "agent",
+            },
+        )
         assert resp.status_code == 422  # Pydantic validation error
+
+    def test_list_users_returns_active_staff(self, client, db):
+        roles = seed_roles(db)
+        agent = seed_user(db, roles, "agent", email="agent@test.com")
+        supervisor = seed_user(db, roles, "supervisor", email="supervisor@test.com")
+        db.commit()
+
+        resp = client.get("/auth/users", headers=auth_headers(client, agent.email))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [user["email"] for user in data] == ["agent@test.com", "supervisor@test.com"]
+        assert data[0]["role_name"] == "agent"
 
 
 # ─── Customer tests ───────────────────────────────────────────────────────────
