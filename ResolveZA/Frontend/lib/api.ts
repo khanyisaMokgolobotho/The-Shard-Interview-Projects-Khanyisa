@@ -1,4 +1,5 @@
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/auth";
+import type { TokenResponse } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -38,10 +39,7 @@ async function refreshAccessToken() {
     return null;
   }
 
-  const nextTokens = (await response.json()) as {
-    access_token: string;
-    refresh_token: string;
-  };
+  const nextTokens = (await response.json()) as TokenResponse;
 
   setTokens(nextTokens.access_token, nextTokens.refresh_token);
   return nextTokens.access_token;
@@ -50,7 +48,9 @@ async function refreshAccessToken() {
 function handleAuthFailure() {
   clearTokens();
   if (typeof window !== "undefined") {
-    window.location.href = "/login";
+    const nextUrl = new URL("/login", window.location.origin);
+    nextUrl.searchParams.set("from", `${window.location.pathname}${window.location.search}`);
+    window.location.href = nextUrl.toString();
   }
 }
 

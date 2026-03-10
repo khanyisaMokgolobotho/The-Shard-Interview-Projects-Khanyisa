@@ -30,7 +30,11 @@ export default function LoginPage() {
         retryOn401: false,
       });
       setTokens(tokens.access_token, tokens.refresh_token);
-      router.push("/dashboard");
+      const nextPath =
+        typeof window === "undefined"
+          ? null
+          : new URL(window.location.href).searchParams.get("from");
+      router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/dashboard");
     } catch (caughtError) {
       if (caughtError instanceof ApiError) {
         if (caughtError.status === 401) {

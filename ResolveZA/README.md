@@ -21,6 +21,9 @@ ResolveZA/
 - JWT-based staff authentication
 - Protected frontend routes for authenticated users
 - Customer, ticket, and refund workflows in the backend
+- Protected dashboard shell with sidebar navigation, current-user state, and logout
+- Live overview, customers, tickets, and refunds pages backed by real API data
+- Typed frontend dashboard data layer for users, customers, accounts, transactions, tickets, and refunds
 - Security hardening in the backend API layer
 - TypeScript frontend API client wired to the backend
 
@@ -42,7 +45,7 @@ ResolveZA/
 To run the full stack with Docker:
 
 ```powershell
-docker compose up --build
+docker compose up --build -d
 ```
 
 This starts:
@@ -51,6 +54,12 @@ This starts:
 - `backend` at `http://localhost:8000`
 - `sqlserver` at `localhost:1433`
 - `redis` at `localhost:6379`
+
+After the stack is up:
+
+- open `http://localhost:3000`
+- unauthenticated requests are redirected to `http://localhost:3000/login`
+- sign in with one of the seeded staff accounts below
 
 ## Backend Setup
 
@@ -156,6 +165,13 @@ From `Frontend/`:
 npm run dev
 ```
 
+The frontend shell includes:
+
+- `/dashboard` for overview metrics and recent queue activity
+- `/customers` for customer, account, transaction, ticket, and refund relationships
+- `/tickets` for ticket detail, message history, and status updates
+- `/refunds` for refund review with linked ticket, customer, and transaction context
+
 Or run the frontend Docker image:
 
 ```powershell
@@ -181,6 +197,12 @@ Login page:
 
 - `http://localhost:3000/login`
 
+Primary frontend dashboard files:
+
+- [`Frontend/lib/dashboard.ts`](/c:/Users/khany/The-Shard-Interview-Projects-Khanyisa/ResolveZA/Frontend/lib/dashboard.ts)
+- [`Frontend/lib/dashboard-session.tsx`](/c:/Users/khany/The-Shard-Interview-Projects-Khanyisa/ResolveZA/Frontend/lib/dashboard-session.tsx)
+- [`Frontend/app/(dashboard)/layout.tsx`](/c:/Users/khany/The-Shard-Interview-Projects-Khanyisa/ResolveZA/Frontend/app/(dashboard)/layout.tsx)
+
 ## Verification
 
 Full stack compose validation:
@@ -201,6 +223,13 @@ Frontend build:
 ```powershell
 cd Frontend
 npm run build
+```
+
+To rebuild and restart the full stack after frontend changes:
+
+```powershell
+docker compose up --build -d
+docker compose ps
 ```
 
 Backend tests:
