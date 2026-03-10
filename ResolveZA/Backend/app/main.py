@@ -4,6 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.core.middleware import (
+    InputSanitizationMiddleware,
+    LoginRateLimiter,
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.customers import router as customers_router
@@ -43,6 +49,11 @@ app = FastAPI(
     redoc_url="/redoc" if settings.app_debug else None,
     lifespan=lifespan,
 )
+app.state.limiter = LoginRateLimiter()
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestSizeLimitMiddleware)
+app.add_middleware(InputSanitizationMiddleware)
 
 # ---------------------------------------------------------------------------
 # CORS Middleware

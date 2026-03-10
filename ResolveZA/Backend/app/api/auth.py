@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -14,12 +14,34 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
 @router.post("/login", response_model=TokenResponse, summary="Login and get JWT tokens")
-def login(request: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    request: LoginRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
     """
     Authenticate with email and password.
     Returns access_token (30 min) and refresh_token (7 days).
     """
-    return auth_service.login(db, request)
+    limiter = getattr(http_request.app.state, "limiter", None)
+    email_key = request.email.strip().lower()
+
+    if limiter and limiter.is_limited(email_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+        )
+
+    try:
+        response = auth_service.login(db, request)
+    except HTTPException as exc:
+        if limiter and exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            limiter.record_failure(email_key)
+        raise
+
+    if limiter:
+        limiter.reset(email_key)
+    return response
 
 
 @router.post("/refresh", response_model=TokenResponse, summary="Refresh access token")
